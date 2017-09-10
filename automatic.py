@@ -1,142 +1,56 @@
 from copy import deepcopy as copy
 from math import ceil
-from random import randint
+from math import log2 as log
+from random import randint, choice
+from phon import *
 import sys
-
-class FeatureBundle(object):
-    def __init__(self,iscons='0'):
-        validValues = ('0','+','-')
-        if iscons in validValues:
-            self.iscons = iscons
-        else:
-            raise TypeError
-
-    def getScore(self,fb2):
-        if type(fb2) != FeatureBundle:
-            raise TypeError
-        else:
-            if self.iscons == fb2.iscons:
-                return 0
-            else:
-                return 1000
-
-    def __hash__(self):
-        return hash((self.iscons))
-
-IPAdict = {'0':FeatureBundle('0'),
-           'p':FeatureBundle('+'),
-           'b':FeatureBundle('+'),
-           't':FeatureBundle('+'),
-           'd':FeatureBundle('+'),
-           'ʈ':FeatureBundle('+'),
-           'ɖ':FeatureBundle('+'),
-           'c':FeatureBundle('+'),
-           'ɟ':FeatureBundle('+'),
-           'k':FeatureBundle('+'),
-           'g':FeatureBundle('+'),
-           'q':FeatureBundle('+'),
-           'ɢ':FeatureBundle('+'),
-           'ʔ':FeatureBundle('+'),
-           'm':FeatureBundle('+'),
-           'ɱ':FeatureBundle('+'),
-           'n':FeatureBundle('+'),
-           'ɳ':FeatureBundle('+'),
-           'ɲ':FeatureBundle('+'),
-           'ŋ':FeatureBundle('+'),
-           'ɴ':FeatureBundle('+'),
-           'ʙ':FeatureBundle('+'),
-           'r':FeatureBundle('+'),
-           'ʀ':FeatureBundle('+'),
-           'ɾ':FeatureBundle('+'),
-           'ɽ':FeatureBundle('+'),
-           'ɸ':FeatureBundle('+'),
-           'β':FeatureBundle('+'),
-           'f':FeatureBundle('+'),
-           'v':FeatureBundle('+'),
-           'θ':FeatureBundle('+'),
-           'ð':FeatureBundle('+'),
-           's':FeatureBundle('+'),
-           'z':FeatureBundle('+'),
-           'ʃ':FeatureBundle('+'),
-           'ʒ':FeatureBundle('+'),
-           'ʂ':FeatureBundle('+'),
-           'ʐ':FeatureBundle('+'),
-           'ç':FeatureBundle('+'),
-           'ʝ':FeatureBundle('+'),
-           'x':FeatureBundle('+'),
-           'ɣ':FeatureBundle('+'),
-           'χ':FeatureBundle('+'),
-           'ʁ':FeatureBundle('+'),
-           'ħ':FeatureBundle('+'),
-           'ʕ':FeatureBundle('+'),
-           'h':FeatureBundle('+'),
-           'ɦ':FeatureBundle('+'),
-           'ɬ':FeatureBundle('+'),
-           'ɮ':FeatureBundle('+'),
-           'ʋ':FeatureBundle('+'),
-           'ɹ':FeatureBundle('+'),
-           'ɻ':FeatureBundle('+'),
-           'j':FeatureBundle('+'),
-           'ɰ':FeatureBundle('+'),
-           'l':FeatureBundle('+'),
-           'ɭ':FeatureBundle('+'),
-           'ʎ':FeatureBundle('+'),
-           'ʟ':FeatureBundle('+'),
-           'i':FeatureBundle('-'),
-           'y':FeatureBundle('-'),
-           'ɨ':FeatureBundle('-'),
-           'ʉ':FeatureBundle('-'),
-           'ɯ':FeatureBundle('-'),
-           'u':FeatureBundle('-'),
-           'ɪ':FeatureBundle('-'),
-           'ʏ':FeatureBundle('-'),
-           'ʊ':FeatureBundle('-'),
-           'e':FeatureBundle('-'),
-           'ø':FeatureBundle('-'),
-           'ɘ':FeatureBundle('-'),
-           'ɵ':FeatureBundle('-'),
-           'ɤ':FeatureBundle('-'),
-           'o':FeatureBundle('-'),
-           'ə':FeatureBundle('-'),
-           'ɛ':FeatureBundle('-'),
-           'œ':FeatureBundle('-'),
-           'ɜ':FeatureBundle('-'),
-           'ɞ':FeatureBundle('-'),
-           'ʌ':FeatureBundle('-'),
-           'ɔ':FeatureBundle('-'),
-           'æ':FeatureBundle('-'),
-           'ɐ':FeatureBundle('-'),
-           'a':FeatureBundle('-'),
-           'ɶ':FeatureBundle('-'),
-           'ɑ':FeatureBundle('-'),
-           'ɒ':FeatureBundle('-')}
-
 
 class cognateSet(object):
     def __init__(self):
         self.noncognates = 0
         self.cogdict = {}
+        self.lang1dict = {}
+        self.lang2dict = {}
+        self.totfreq = 0
 
     def __add__(self,cs2):
         if type(cs2) != cognateSet:
             raise TypeError
         else:
-            newcognate = cognateSet()
-            newcognate.cogdict = copy(self.cogdict)
-            newcognate.noncognates = self.noncognates
+            newcognate = copy(self)
             newcognate.noncognates += cs2.noncognates
             for key1 in cs2.cogdict:
                 for key2 in cs2.cogdict[key1]:
                     for i in range(cs2.cogdict[key1][key2]):
+                        self.totfreq += 1
                         newcognate.update(key1,key2)
+                        try:
+                            newcognate.lang1dict[key1] += 1
+                        except KeyError:
+                            newcognate.lang1dict[key1] = 1
+                        try:
+                            newcognate.lang2dict[key2] += 1
+                        except KeyError:
+                            newcognate.lang2dict[key2] = 1
             return newcognate
 
-    def evaluate(self):
-        score = self.noncognates
+    def calcMI(self):
+        score = 0
         for key1 in self.cogdict:
             for key2 in self.cogdict[key1]:
-                score += 1
-                score += IPAdict[key1].getScore(IPAdict[key2])/self.cogdict[key1][key2]
+                pxy = self.cogdict[key1][key2]/self.totfreq
+                px = self.lang1dict[key1]/self.totfreq
+                py = self.lang2dict[key2]/self.totfreq
+                score += (pxy*(log(pxy)-(log(px)+log(py))))
+        return log(self.totfreq)-score
+
+    def evaluate(self):
+        score = self.noncognates * noncognateweight
+        score += (self.calcMI() *
+                  confusabilityweight)
+        for key1 in self.cogdict:
+            for key2 in self.cogdict[key1]:
+                score += IPAdict[key1].getScore(IPAdict[key2])
         return score
 
     def update(self,c1,c2):
@@ -148,14 +62,25 @@ class cognateSet(object):
             except KeyError:
                 self.cogdict[c1] = {}
                 self.cogdict[c1][c2] = 1
+        try:
+            self.lang1dict[c1] += 1
+        except KeyError:
+            self.lang1dict[c1] = 1
+        try:
+            self.lang2dict[c2] += 1
+        except KeyError:
+            self.lang2dict[c2] = 1
+        self.totfreq += 1
         return self
 
     def __str__(self):
         out = 'Non-Cognates: '+str(self.noncognates)+'; '
+        out += 'Total Freq: ' + str(self.totfreq) +'; '
         for key1 in self.cogdict:
             for key2 in self.cogdict[key1]:
                 out += key1+':'+key2+'='+str(self.cogdict[key1][key2])+'; '
         return out
+
     def __eq__(self,cs2):
         if type(cs2) != cognateSet:
             return False
@@ -232,16 +157,17 @@ def testPair(pair,coglist):
     scores = []
     for cog in mycogs:
         scores.append(cog.__add__(curcog).evaluate())
+    minscore = min(scores)
+    print('Minscore: ' + str(minscore))
     maxscore = ceil(sum(scores))
-    print(scores)
-    newscores = [maxscore/x for x in scores]
-    newmax = ceil(sum(newscores))
-    q = randint(0,newmax)
-    for i in range(len(newscores)):
-        q -= newscores[i]
-        if q < 0:
-            break
-    return mycogs[i]
+    print('Maxscore: ' + str(minscore))
+    q = randint(0,maxscore)
+    input('q: '+str(q))
+    if q < minscore:
+        return choice([mycogs[i] for i in range(len(mycogs))
+                       if scores[i] == minscore])
+    else:
+        return choice(mycogs)
 
 def printCognates(pairs,curcognates):
     for i in range(len(pairs)):
