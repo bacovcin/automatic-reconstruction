@@ -7,6 +7,9 @@ import sys
 
 class cognateSet(object):
     def __init__(self):
+        """Cognate sets have a list of cognates, non-cognate score,
+           counts for lang1 and lang2 segments and total number of segment
+           pairs"""
         self.noncognates = 0
         self.cogdict = {}
         self.lang1dict = {}
@@ -14,6 +17,8 @@ class cognateSet(object):
         self.totfreq = 0
 
     def __add__(self,cs2):
+        """Combine two cognate sets by copying one and then adding in all
+           the features of the second"""
         if type(cs2) != cognateSet:
             raise TypeError
         else:
@@ -35,6 +40,8 @@ class cognateSet(object):
             return newcognate
 
     def calcMI(self):
+        """Calcuate the mutual information of the current language 1 and
+           language 2 cognations"""
         score = 0
         for key1 in self.cogdict:
             for key2 in self.cogdict[key1]:
@@ -42,9 +49,14 @@ class cognateSet(object):
                 px = self.lang1dict[key1]/self.totfreq
                 py = self.lang2dict[key2]/self.totfreq
                 score += (pxy*(log(pxy)-(log(px)+log(py))))
-        return log(self.totfreq)-score
+        try:
+            return log(self.totfreq)-score
+        except:
+            return 0
 
     def evaluate(self):
+        """Calculate the score of a cognate set: noncognate score +
+           confusability score + phonology score"""
         score = self.noncognates * noncognateweight
         score += (self.calcMI() *
                   confusabilityweight)
@@ -54,6 +66,7 @@ class cognateSet(object):
         return score
 
     def update(self,c1,c2):
+        """Add a new pair of segments to the set"""
         try:
             self.cogdict[c1][c2] += 1
         except KeyError:
@@ -74,6 +87,7 @@ class cognateSet(object):
         return self
 
     def __str__(self):
+        """Method for printing a cognate set"""
         out = 'Non-Cognates: '+str(self.noncognates)+'; '
         out += 'Total Freq: ' + str(self.totfreq) +'; '
         for key1 in self.cogdict:
@@ -82,6 +96,8 @@ class cognateSet(object):
         return out
 
     def __eq__(self,cs2):
+        """Two cognate sets are equal if they have the same noncognate score,
+           and the same segment association counts"""
         if type(cs2) != cognateSet:
             return False
         else:
@@ -99,6 +115,8 @@ class cognateSet(object):
         return not __eq__(self,cs2)
 
 def getListOfCognates(str1,str2,curcognate):
+    """Recursive function that finds all alignments between to strings and
+       returns the cognate set associated with each alignment"""
     cognates = []
     if len(str1) == 0:
         if len(str2) == 0:
@@ -138,6 +156,7 @@ def getListOfCognates(str1,str2,curcognate):
     return cognates
 
 def createPairs(lang1,lang2):
+    """Do pairwise comparison in cases of polymorphy"""
     pairs = []
     for i in range(len(lang1)):
         for word1 in lang1[i]:
@@ -146,6 +165,7 @@ def createPairs(lang1,lang2):
     return pairs
 
 def testPair(pair,coglist):
+    """Determine the next cognate set to choose for a pair"""
     curcog = cognateSet()
     for cog in coglist:
         curcog += cog
@@ -158,11 +178,8 @@ def testPair(pair,coglist):
     for cog in mycogs:
         scores.append(cog.__add__(curcog).evaluate())
     minscore = min(scores)
-    print('Minscore: ' + str(minscore))
     maxscore = ceil(sum(scores))
-    print('Maxscore: ' + str(minscore))
     q = randint(0,maxscore)
-    input('q: '+str(q))
     if q < minscore:
         return choice([mycogs[i] for i in range(len(mycogs))
                        if scores[i] == minscore])
@@ -170,6 +187,7 @@ def testPair(pair,coglist):
         return choice(mycogs)
 
 def printCognates(pairs,curcognates):
+    """Print a list of pairs of words and if they are cognate"""
     for i in range(len(pairs)):
         if curcognates[i].noncognates > 0:
             print(pairs[i][0] + ' ~ ' + pairs[i][1] +': Not Cognate')
@@ -177,6 +195,7 @@ def printCognates(pairs,curcognates):
             print(pairs[i][0] + ' ~ ' + pairs[i][1] +': Cognate')
 
 if __name__ == '__main__':
+    """Main function"""
     pairs = createPairs([x.rstrip().split(',') for x in open(sys.argv[1])],
                         [x.rstrip().split(',') for x in open(sys.argv[2])])
     curcognates = []
